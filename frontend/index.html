@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CECMS — College Event & Club Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">◈</div>
+      <div class="brand-text">
+        <span class="brand-title">CECMS</span>
+        <span class="brand-sub">Management Portal</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">⬡</span>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="students">
+        <span class="nav-icon">◉</span>
+        <span>Students</span>
+      </button>
+      <button class="nav-item" data-page="events">
+        <span class="nav-icon">◈</span>
+        <span>Events</span>
+      </button>
+      <button class="nav-item" data-page="registrations">
+        <span class="nav-icon">◎</span>
+        <span>Registrations</span>
+      </button>
+      <button class="nav-item" data-page="payments">
+        <span class="nav-icon">◇</span>
+        <span>Payments</span>
+      </button>
+      <button class="nav-item" data-page="feedback">
+        <span class="nav-icon">◫</span>
+        <span>Feedback</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-label">College Event & Club<br/>Management System</div>
+    </div>
+  </aside>
+
+
+  <main class="main">
+
+    <header class="topbar">
+      <button class="menu-toggle" id="menuToggle">☰</button>
+      <div class="topbar-title" id="topbarTitle">Dashboard</div>
+      <div class="topbar-right">
+        <div class="status-dot"></div>
+        <span class="status-label">Live</span>
+      </div>
+    </header>
+
+
+    <div class="toast-container" id="toastContainer"></div>
+
+
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modalTitle">Add Record</h2>
+          <button class="modal-close" id="modalClose">✕</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+      </div>
+    </div>
+
+    <section class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">System overview at a glance</p>
+      </div>
+
+      <div class="stat-grid" id="dashboardStats">
+        <div class="stat-card" data-color="blue">
+          <div class="stat-icon">◉</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-students">—</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="violet">
+          <div class="stat-icon">◈</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-events">—</div>
+            <div class="stat-label">Total Events</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="emerald">
+          <div class="stat-icon">◎</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-registrations">—</div>
+            <div class="stat-label">Registrations</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="amber">
+          <div class="stat-icon">◇</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-payments">—</div>
+            <div class="stat-label">Payments</div>
+          </div>
+        </div>
+        <div class="stat-card" data-color="rose">
+          <div class="stat-icon">◫</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-feedback">—</div>
+            <div class="stat-label">Feedback</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-panels">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Recent Registrations</span></div>
+          <div class="table-wrap">
+            <table class="data-table" id="dashRecentRegs">
+              <thead><tr><th>ID</th><th>Student</th><th>Event</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Recent Payments</span></div>
+          <div class="table-wrap">
+            <table class="data-table" id="dashRecentPayments">
+              <thead><tr><th>ID</th><th>Reg. ID</th><th>Amount</th><th>Mode</th><th>Status</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-students">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Students</h1>
+          <p class="page-subtitle">Manage student records</p>
+        </div>
+        <button class="btn btn-primary" id="btnAddStudent">+ Add Student</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">All Students</span>
+          <input class="search-input" id="searchStudents" type="text" placeholder="Search name, roll, email…" />
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="studentsTable">
+            <thead>
+              <tr>
+                <th>ID</th><th>Roll No</th><th>Full Name</th><th>Email</th>
+                <th>Department</th><th>Year</th><th>Phone</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="studentsBody">
+              <tr><td colspan="8" class="empty-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-events">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Events</h1>
+          <p class="page-subtitle">View and create college events</p>
+        </div>
+        <button class="btn btn-primary" id="btnAddEvent">+ Add Event</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">All Events</span>
+          <input class="search-input" id="searchEvents" type="text" placeholder="Search title or type…" />
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="eventsTable">
+            <thead>
+              <tr>
+                <th>ID</th><th>Title</th><th>Type</th><th>Start</th><th>End</th>
+                <th>Reg. Type</th><th>Capacity</th><th>Fee (₹)</th><th>Club ID</th><th>Venue ID</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="eventsBody">
+              <tr><td colspan="11" class="empty-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-registrations">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Registrations</h1>
+          <p class="page-subtitle">Register students for events</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-primary" id="btnRegisterTeamGroup">+ Register Team Group</button>
+          <button class="btn btn-primary" id="btnEditTeam">+ Edit Team</button>
+          <button class="btn btn-primary" id="btnAddTeam">+ Create Team</button>
+          <button class="btn btn-primary" id="btnAddRegistration">+ New Individual Registration</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">All Registrations</span>
+          <input class="search-input" id="searchRegistrations" type="text" placeholder="Search by student or event ID…" />
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="registrationsTable">
+            <thead>
+              <tr>
+                <th>Reg. ID</th><th>Student ID</th><th>Student Name</th><th>Event ID</th>
+                <th>Event Title</th><th>Team ID</th><th>Date</th><th>Status</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="registrationsBody">
+              <tr><td colspan="9" class="empty-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-payments">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Payments</h1>
+          <p class="page-subtitle">Track event payments</p>
+        </div>
+        <button class="btn btn-primary" id="btnAddPayment">+ Record Payment</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">All Payments</span>
+          <input class="search-input" id="searchPayments" type="text" placeholder="Search by payment or reg. ID…" />
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="paymentsTable">
+            <thead>
+              <tr>
+                <th>Pay. ID</th><th>Reg. ID</th><th>Student</th><th>Event</th>
+                <th>Amount (₹)</th><th>Mode</th><th>Status</th><th>Date</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsBody">
+              <tr><td colspan="9" class="empty-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="page" id="page-feedback">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Feedback</h1>
+          <p class="page-subtitle">Student event feedback &amp; ratings</p>
+        </div>
+        <button class="btn btn-primary" id="btnAddFeedback">+ Submit Feedback</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">All Feedback</span>
+          <input class="search-input" id="searchFeedback" type="text" placeholder="Search by student or event ID…" />
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="feedbackTable">
+            <thead>
+              <tr>
+                <th>FB. ID</th><th>Student</th><th>Event</th><th>Rating</th><th>Comments</th><th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="feedbackBody">
+              <tr><td colspan="6" class="empty-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
