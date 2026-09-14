@@ -1,5 +1,5 @@
 # CampusFlow
-#### Video Demo: <VIDEO_URL>
+#### Video Demo: https://youtu.be/oWJdq0RlFXM
 #### Description:
 
 CampusFlow is a college event management system for managing students, events, registrations, teams, payments, and feedback. Campus events can leave participant lists, team details, payment records, club information, and feedback scattered across different systems. CampusFlow brings these related records together in a MySQL relational database and provides a dashboard for managing the complete event workflow.
