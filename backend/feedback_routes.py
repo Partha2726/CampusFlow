@@ -31,7 +31,7 @@ def get_feedback():
         query += " AND F.STUDENT_ID = %s"
         params.append(student_id)
 
-    query += " ORDER BY F.SUBMITTED_DATE DESC"
+    query += " ORDER BY F.FEEDBACK_ID ASC"
 
     feedbacks = execute_query(query, params, fetch=True)
 

@@ -23,7 +23,7 @@ def create_app():
     # Health check
     @app.route("/api/health", methods=["GET"])
     def health():
-        return jsonify({"status": "ok", "service": "CECMS API"}), 200
+        return jsonify({"status": "ok", "service": "CampusFlow API"}), 200
 
     @app.after_request
     def add_cors_headers(response):

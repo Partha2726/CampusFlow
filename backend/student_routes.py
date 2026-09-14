@@ -20,7 +20,7 @@ def get_students():
         query += " AND ACADEMIC_YEAR = %s"
         params.append(year)
 
-    query += " ORDER BY FULL_NAME"
+    query += " ORDER BY STUDENT_ID ASC"
 
     students = execute_query(query, params, fetch=True)
     return jsonify({"success": True, "data": students, "count": len(students)}), 200

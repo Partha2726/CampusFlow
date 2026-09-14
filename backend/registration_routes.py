@@ -66,7 +66,7 @@ def get_registrations():
         query += " AND R.STATUS = %s"
         params.append(status)
 
-    query += " ORDER BY R.REGISTRATION_DATE DESC"
+    query += " ORDER BY R.REGISTRATION_ID ASC"
 
     registrations = execute_query(query, params, fetch=True)
     return jsonify({"success": True, "data": registrations, "count": len(registrations)}), 200
@@ -129,7 +129,7 @@ def create_registration():
     # Check max capacity
     if event["MAX_CAPACITY"]:
         current_count = execute_query(
-            "SELECT COUNT(*) AS cnt FROM REGISTRATION WHERE EVENT_ID = %s AND STATUS != 'CANCELLED'",
+            "SELECT COUNT(*) AS cnt FROM REGISTRATION WHERE EVENT_ID = %s",
             (data["event_id"],),
             fetch_one=True,
         )
@@ -200,7 +200,7 @@ def create_team_registrations():
     if not data:
         return jsonify({"success": False, "error": "Request body is required"}), 400
 
-    required = ["team_id", "registration_date"]
+    required = ["registration_id", "team_id", "registration_date"]
     missing = [f for f in required if f not in data]
     if missing:
         return jsonify({"success": False, "error": f"Missing fields: {missing}"}), 400
@@ -252,18 +252,31 @@ def create_team_registrations():
 
     if event["MAX_CAPACITY"]:
         current_count = execute_query(
-            "SELECT COUNT(*) AS cnt FROM REGISTRATION WHERE EVENT_ID = %s AND STATUS != 'CANCELLED'",
+            "SELECT COUNT(*) AS cnt FROM REGISTRATION WHERE EVENT_ID = %s",
             (team["EVENT_ID"],),
             fetch_one=True,
         )
         if current_count["cnt"] + len(member_ids) > event["MAX_CAPACITY"]:
             return jsonify({"success": False, "error": "Event does not have enough capacity for entire team"}), 409
 
-    max_row = execute_query(
-        "SELECT COALESCE(MAX(REGISTRATION_ID), 0) AS max_id FROM REGISTRATION",
-        fetch_one=True,
+    try:
+        next_reg_id = int(data["registration_id"])
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "registration_id must be numeric"}), 400
+
+    registration_ids = [next_reg_id + i for i in range(len(member_ids))]
+    id_placeholders = ", ".join(["%s"] * len(registration_ids))
+    existing_ids = execute_query(
+        f"SELECT REGISTRATION_ID FROM REGISTRATION WHERE REGISTRATION_ID IN ({id_placeholders})",
+        tuple(registration_ids),
+        fetch=True,
     )
-    next_reg_id = int(max_row["max_id"]) + 1
+    if existing_ids:
+        duplicate_registration_ids = [r["REGISTRATION_ID"] for r in existing_ids]
+        return jsonify({
+            "success": False,
+            "error": f"Registration IDs already exist: {duplicate_registration_ids}",
+        }), 409
 
     registration_status = "PENDING" if _is_paid_event(event) else "REGISTERED"
     created = []
@@ -323,7 +336,7 @@ def update_registration_status(registration_id):
     if not data or "status" not in data:
         return jsonify({"success": False, "error": "'status' field is required"}), 400
 
-    allowed_statuses = ["PENDING", "REGISTERED", "CONFIRMED", "CANCELLED", "ATTENDED"]
+    allowed_statuses = ["PENDING", "REGISTERED", "CONFIRMED", "ATTENDED"]
     if data["status"] not in allowed_statuses:
         return jsonify({
             "success": False,
@@ -350,12 +363,21 @@ def update_registration_status(registration_id):
     if _is_paid_event(existing):
         payment_status = existing.get("PAYMENT_STATUS")
         payment_status_norm = str(payment_status).upper() if payment_status is not None else None
-        if payment_status_norm is None or payment_status_norm == "PENDING":
-            if data["status"] not in ("PENDING", "REGISTERED"):
-                return jsonify({
-                    "success": False,
-                    "error": "For paid events, update payment status first before changing registration to CONFIRMED/CANCELLED/ATTENDED",
-                }), 409
+        if payment_status_norm != "SUCCESS" and data["status"] != "PENDING":
+            return jsonify({
+                "success": False,
+                "error": "Registration cannot be confirmed until payment is successful.",
+            }), 409
+        if payment_status_norm == "SUCCESS" and data["status"] == "PENDING":
+            return jsonify({
+                "success": False,
+                "error": "Paid registrations with successful payment must be REGISTERED, CONFIRMED, or ATTENDED",
+            }), 409
+    elif data["status"] == "PENDING":
+        return jsonify({
+            "success": False,
+            "error": "Free event registrations must be REGISTERED, CONFIRMED, or ATTENDED",
+        }), 409
 
     execute_query(
         "UPDATE REGISTRATION SET STATUS = %s WHERE REGISTRATION_ID = %s",

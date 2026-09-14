@@ -5,6 +5,20 @@ from db import execute_query
 event_bp = Blueprint("events", __name__)
 
 
+def _validate_non_negative_event_fields(data):
+    for field in ("max_capacity", "fee", "club_id", "venue_id"):
+        value = data.get(field)
+        if value is None or value == "":
+            continue
+        try:
+            is_negative = float(value) < 0
+        except (TypeError, ValueError):
+            return field
+        if is_negative:
+            return field
+    return None
+
+
 @event_bp.route("/api/events", methods=["GET"])
 def get_events():
     event_type = request.args.get("event_type")
@@ -35,7 +49,7 @@ def get_events():
         query += " AND E.VENUE_ID = %s"
         params.append(venue_id)
 
-    query += " ORDER BY E.START_DATETIME DESC"
+    query += " ORDER BY E.EVENT_ID ASC"
 
     events = execute_query(query, params, fetch=True)
     return jsonify({"success": True, "data": events, "count": len(events)}), 200
@@ -77,6 +91,10 @@ def create_event():
     missing = [f for f in required if f not in data]
     if missing:
         return jsonify({"success": False, "error": f"Missing fields: {missing}"}), 400
+
+    negative_field = _validate_non_negative_event_fields(data)
+    if negative_field:
+        return jsonify({"success": False, "error": f"{negative_field} cannot be negative"}), 400
 
     # Validate referenced club exists
     if data.get("club_id"):
@@ -154,6 +172,10 @@ def update_event(event_id):
     missing = [f for f in required if f not in data]
     if missing:
         return jsonify({"success": False, "error": f"Missing fields: {missing}"}), 400
+
+    negative_field = _validate_non_negative_event_fields(data)
+    if negative_field:
+        return jsonify({"success": False, "error": f"{negative_field} cannot be negative"}), 400
 
     # Validate referenced club exists
     if data.get("club_id"):

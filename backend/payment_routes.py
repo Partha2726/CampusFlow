@@ -5,6 +5,23 @@ from db import execute_query
 payment_bp = Blueprint("payments", __name__)
 
 
+def _validate_amount(amount):
+    try:
+        parsed = float(amount)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _mark_registration_registered_if_success(registration_id, payment_status):
+    if payment_status == "SUCCESS":
+        execute_query(
+            "UPDATE REGISTRATION SET STATUS = 'REGISTERED' WHERE REGISTRATION_ID = %s AND STATUS = 'PENDING'",
+            (registration_id,),
+            commit=True,
+        )
+
+
 @payment_bp.route("/api/payments", methods=["GET"])
 def get_payments():
     registration_id = request.args.get("registration_id")
@@ -37,7 +54,7 @@ def get_payments():
         query += " AND P.PAYMENT_MODE = %s"
         params.append(payment_mode)
 
-    query += " ORDER BY P.PAYMENT_DATE DESC"
+    query += " ORDER BY P.PAYMENT_ID ASC"
 
     payments = execute_query(query, params, fetch=True)
     return jsonify({"success": True, "data": payments, "count": len(payments)}), 200
@@ -86,6 +103,18 @@ def create_payment():
             "error": f"payment_mode must be one of {allowed_modes}",
         }), 400
 
+    amount = _validate_amount(data["amount"])
+    if amount is None:
+        return jsonify({"success": False, "error": "Amount cannot be negative"}), 400
+
+    allowed_statuses = ["PENDING", "SUCCESS"]
+    payment_status = data.get("payment_status", "PENDING")
+    if payment_status not in allowed_statuses:
+        return jsonify({
+            "success": False,
+            "error": f"payment_status must be one of {allowed_statuses}",
+        }), 400
+
     # Validate registration exists
     registration = execute_query(
         "SELECT REGISTRATION_ID FROM REGISTRATION WHERE REGISTRATION_ID = %s",
@@ -95,13 +124,13 @@ def create_payment():
     if not registration:
         return jsonify({"success": False, "error": "Registration not found"}), 404
 
-    # Prevent duplicate payment for same registration (allow only if prior was FAILED)
+    # Prevent duplicate payment for same registration.
     existing_payment = execute_query(
         "SELECT PAYMENT_ID, PAYMENT_STATUS FROM PAYMENT WHERE REGISTRATION_ID = %s",
         (data["registration_id"],),
         fetch_one=True,
     )
-    if existing_payment and existing_payment["PAYMENT_STATUS"] not in ("FAILED",):
+    if existing_payment:
         return jsonify({
             "success": False,
             "error": "A payment already exists for this registration",
@@ -116,13 +145,14 @@ def create_payment():
             (
                 data["payment_id"],
                 data["registration_id"],
-                data["amount"],
+                amount,
                 data["payment_mode"],
-                data.get("payment_status", "PENDING"),
+                payment_status,
                 data["payment_date"],
             ),
             commit=True,
         )
+        _mark_registration_registered_if_success(data["registration_id"], payment_status)
         return jsonify({"success": True, "message": "Payment recorded successfully"}), 201
 
     except pymysql.err.IntegrityError as e:
@@ -152,7 +182,11 @@ def update_payment(payment_id):
             "error": f"payment_mode must be one of {allowed_modes}",
         }), 400
 
-    allowed_statuses = ["PENDING", "SUCCESS", "FAILED", "REFUNDED"]
+    amount = _validate_amount(data["amount"])
+    if amount is None:
+        return jsonify({"success": False, "error": "Amount cannot be negative"}), 400
+
+    allowed_statuses = ["PENDING", "SUCCESS"]
     if data["payment_status"] not in allowed_statuses:
         return jsonify({
             "success": False,
@@ -184,7 +218,7 @@ def update_payment(payment_id):
         (data["registration_id"], payment_id),
         fetch_one=True,
     )
-    if duplicate_check and duplicate_check["PAYMENT_STATUS"] not in ("FAILED",):
+    if duplicate_check:
         return jsonify({
             "success": False,
             "error": "Another active payment already exists for this registration",
@@ -203,7 +237,7 @@ def update_payment(payment_id):
         """,
         (
             data["registration_id"],
-            data["amount"],
+            amount,
             data["payment_mode"],
             data["payment_status"],
             data["payment_date"],
@@ -211,6 +245,7 @@ def update_payment(payment_id):
         ),
         commit=True,
     )
+    _mark_registration_registered_if_success(data["registration_id"], data["payment_status"])
     return jsonify({"success": True, "message": "Payment updated successfully"}), 200
 
 
@@ -220,7 +255,7 @@ def update_payment_status(payment_id):
     if not data or "payment_status" not in data:
         return jsonify({"success": False, "error": "'payment_status' field is required"}), 400
 
-    allowed_statuses = ["PENDING", "SUCCESS", "FAILED", "REFUNDED"]
+    allowed_statuses = ["PENDING", "SUCCESS"]
     if data["payment_status"] not in allowed_statuses:
         return jsonify({
             "success": False,
@@ -228,7 +263,7 @@ def update_payment_status(payment_id):
         }), 400
 
     existing = execute_query(
-        "SELECT PAYMENT_ID FROM PAYMENT WHERE PAYMENT_ID = %s",
+        "SELECT PAYMENT_ID, REGISTRATION_ID FROM PAYMENT WHERE PAYMENT_ID = %s",
         (payment_id,),
         fetch_one=True,
     )
@@ -240,6 +275,7 @@ def update_payment_status(payment_id):
         (data["payment_status"], payment_id),
         commit=True,
     )
+    _mark_registration_registered_if_success(existing["REGISTRATION_ID"], data["payment_status"])
     return jsonify({"success": True, "message": "Payment status updated"}), 200
 
 

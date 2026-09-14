@@ -25,7 +25,7 @@ def get_teams():
         query += " AND T.EVENT_ID = %s"
         params.append(event_id)
 
-    query += " ORDER BY T.CREATED_DATE DESC, T.TEAM_NAME"
+    query += " ORDER BY T.TEAM_ID ASC"
 
     teams = execute_query(query, params, fetch=True)
     return jsonify({"success": True, "data": teams, "count": len(teams)}), 200

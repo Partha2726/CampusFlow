@@ -1,5 +1,5 @@
 /* ============================================================
-   CECMS — script.js
+   CampusFlow — script.js
    Complete frontend logic: navigation, API calls, tables, forms
    ============================================================ */
 
@@ -16,7 +16,6 @@ let cachedRegistrations = [];
    ============================================================ */
 const navItems   = document.querySelectorAll('.nav-item');
 const pages      = document.querySelectorAll('.page');
-const topbarTitle = document.getElementById('topbarTitle');
 const menuToggle  = document.getElementById('menuToggle');
 const sidebar     = document.getElementById('sidebar');
 
@@ -32,17 +31,16 @@ const PAGE_TITLES = {
 function navigateTo(pageId) {
   navItems.forEach(btn => btn.classList.toggle('active', btn.dataset.page === pageId));
   pages.forEach(p => p.classList.toggle('active', p.id === `page-${pageId}`));
-  topbarTitle.textContent = PAGE_TITLES[pageId] || pageId;
   sidebar.classList.remove('open');
   loadPage(pageId);
 }
 
 navItems.forEach(btn => btn.addEventListener('click', () => navigateTo(btn.dataset.page)));
 
-menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+menuToggle?.addEventListener('click', () => sidebar.classList.toggle('open'));
 
 document.addEventListener('click', e => {
-  if (!sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
+  if (!sidebar.contains(e.target) && !menuToggle?.contains(e.target)) {
     sidebar.classList.remove('open');
   }
 });
@@ -162,11 +160,8 @@ function badge(text) {
     PENDING:   'badge-pending',
     REGISTERED:'badge-confirmed',
     CONFIRMED: 'badge-confirmed',
-    CANCELLED: 'badge-cancelled',
     ATTENDED:  'badge-attended',
     SUCCESS:   'badge-success',
-    FAILED:    'badge-failed',
-    REFUNDED:  'badge-refunded',
   };
   const cls = map[text?.toUpperCase()] || 'badge-default';
   return `<span class="badge ${cls}">${text}</span>`;
@@ -208,6 +203,16 @@ function genId() {
   return Math.floor(Date.now() / 1000) % 1000000 + Math.floor(Math.random() * 999);
 }
 
+function isValidInput(id) {
+  const input = document.getElementById(id);
+  if (!input) return true;
+  return input.checkValidity();
+}
+
+function hasNegativeEventValues(body) {
+  return ['max_capacity', 'fee', 'club_id', 'venue_id'].some(key => body[key] !== null && body[key] !== undefined && Number(body[key]) < 0);
+}
+
 /* ============================================================
    SEARCH FILTER HELPER
    ============================================================ */
@@ -243,7 +248,10 @@ async function loadDashboard() {
     document.getElementById('stat-feedback').textContent      = fbRes.count ?? 0;
 
     // Recent registrations (last 5)
-    const regs = (regRes.data || []).slice(0, 5);
+    const regs = (regRes.data || [])
+      .slice()
+      .sort((a, b) => new Date(b.REGISTRATION_DATE || 0) - new Date(a.REGISTRATION_DATE || 0) || Number(b.REGISTRATION_ID) - Number(a.REGISTRATION_ID))
+      .slice(0, 5);
     const regTbody = document.querySelector('#dashRecentRegs tbody');
     regTbody.innerHTML = regs.length ? regs.map(r => `
       <tr>
@@ -255,7 +263,10 @@ async function loadDashboard() {
       </tr>`).join('') : `<tr><td colspan="5" class="empty-row">No registrations yet</td></tr>`;
 
     // Recent payments (last 5)
-    const pays = (payRes.data || []).slice(0, 5);
+    const pays = (payRes.data || [])
+      .slice()
+      .sort((a, b) => new Date(b.PAYMENT_DATE || 0) - new Date(a.PAYMENT_DATE || 0) || Number(b.PAYMENT_ID) - Number(a.PAYMENT_ID))
+      .slice(0, 5);
     const payTbody = document.querySelector('#dashRecentPayments tbody');
     payTbody.innerHTML = pays.length ? pays.map(p => `
       <tr>
@@ -314,6 +325,7 @@ function renderStudentsTable(students) {
 
 document.getElementById('btnAddStudent').addEventListener('click', () => {
   openModal('Add New Student', studentForm());
+  attachPhoneFilter();
   document.getElementById('studentSubmitBtn').addEventListener('click', submitAddStudent);
 });
 
@@ -356,13 +368,21 @@ function studentForm(data = {}) {
       </div>
       <div class="form-group">
         <label class="form-label">Phone</label>
-        <input class="form-control" id="f_phone" type="tel" placeholder="10-digit number" value="${data.PHONE || ''}">
+        <input class="form-control" id="f_phone" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit number" value="${data.PHONE || ''}">
       </div>
     </div>
     <div class="form-actions">
       <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" id="studentSubmitBtn">Save Student</button>
     </div>`;
+}
+
+function attachPhoneFilter() {
+  const phoneInput = document.getElementById('f_phone');
+  if (!phoneInput) return;
+  phoneInput.addEventListener('input', () => {
+    phoneInput.value = phoneInput.value.replace(/\D/g, '').slice(0, 10);
+  });
 }
 
 async function submitAddStudent() {
@@ -378,6 +398,9 @@ async function submitAddStudent() {
 
   if (!body.student_id || !body.roll_no || !body.full_name || !body.email || !body.department || !body.academic_year) {
     showToast('Please fill in all required fields', 'error'); return;
+  }
+  if (body.phone && !isValidInput('f_phone')) {
+    showToast('Phone number must be exactly 10 digits', 'error'); return;
   }
 
   try {
@@ -395,6 +418,7 @@ function openEditStudent(studentId) {
   if (!student) return showToast('Student not found', 'error');
 
   openModal('Edit Student', studentForm(student));
+  attachPhoneFilter();
   document.getElementById('f_student_id').disabled = true;
   document.getElementById('studentSubmitBtn').textContent = 'Update Student';
   document.getElementById('studentSubmitBtn').addEventListener('click', () => submitEditStudent(studentId));
@@ -409,6 +433,10 @@ async function submitEditStudent(studentId) {
     academic_year: parseInt(document.getElementById('f_academic_year').value),
     phone:         document.getElementById('f_phone').value.trim() || null,
   };
+
+  if (body.phone && !isValidInput('f_phone')) {
+    showToast('Phone number must be exactly 10 digits', 'error'); return;
+  }
 
   try {
     await apiPut(`/api/students/${studentId}`, body);
@@ -522,19 +550,19 @@ function eventForm(data = {}, isEdit = false) {
       </div>
       <div class="form-group">
         <label class="form-label">Max Capacity</label>
-        <input class="form-control" id="f_max_capacity" type="number" placeholder="Leave blank for unlimited" value="${data.MAX_CAPACITY ?? ''}">
+        <input class="form-control" id="f_max_capacity" type="number" min="0" placeholder="Leave blank for unlimited" value="${data.MAX_CAPACITY ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label">Fee (₹)</label>
-        <input class="form-control" id="f_fee" type="number" step="0.01" placeholder="0.00" value="${data.FEE ?? ''}">
+        <input class="form-control" id="f_fee" type="number" min="0" step="0.01" placeholder="0.00" value="${data.FEE ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label">Club ID</label>
-        <input class="form-control" id="f_club_id" type="number" placeholder="Optional" value="${data.CLUB_ID ?? ''}">
+        <input class="form-control" id="f_club_id" type="number" min="0" placeholder="Optional" value="${data.CLUB_ID ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label">Venue ID</label>
-        <input class="form-control" id="f_venue_id" type="number" placeholder="Optional" value="${data.VENUE_ID ?? ''}">
+        <input class="form-control" id="f_venue_id" type="number" min="0" placeholder="Optional" value="${data.VENUE_ID ?? ''}">
       </div>
     </div>
     <div class="form-actions">
@@ -564,6 +592,9 @@ async function submitAddEvent() {
 
   if (new Date(body.end_datetime) <= new Date(body.start_datetime)) {
     showToast('End date must be after start date', 'error'); return;
+  }
+  if (hasNegativeEventValues(body)) {
+    showToast('Max Capacity, Fee, Club ID, and Venue ID cannot be negative', 'error'); return;
   }
 
   try {
@@ -605,6 +636,9 @@ async function submitEditEvent(eventId) {
   if (new Date(body.end_datetime) <= new Date(body.start_datetime)) {
     showToast('End date must be after start date', 'error'); return;
   }
+  if (hasNegativeEventValues(body)) {
+    showToast('Max Capacity, Fee, Club ID, and Venue ID cannot be negative', 'error'); return;
+  }
 
   try {
     await apiPut(`/api/events/${eventId}`, body);
@@ -641,7 +675,7 @@ async function loadTeams() {
 
 async function loadRegistrations() {
   const tbody = document.getElementById('registrationsBody');
-  tbody.innerHTML = `<tr><td colspan="9" class="empty-row">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="10" class="empty-row">Loading…</td></tr>`;
   try {
     await loadTeams();
     const res = await apiGet('/api/registrations');
@@ -649,7 +683,7 @@ async function loadRegistrations() {
     renderRegistrationsTable(cachedRegistrations);
     setupSearch('searchRegistrations', 'registrationsBody');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-row">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-row">Error: ${err.message}</td></tr>`;
     showToast('Failed to load registrations: ' + err.message, 'error');
   }
 }
@@ -657,7 +691,7 @@ async function loadRegistrations() {
 function renderRegistrationsTable(regs) {
   const tbody = document.getElementById('registrationsBody');
   if (!regs.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-row">No registrations found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-row">No registrations found</td></tr>`;
     return;
   }
   tbody.innerHTML = regs.map(r => `
@@ -667,7 +701,8 @@ function renderRegistrationsTable(regs) {
       <td>${fmt(r.FULL_NAME)}</td>
       <td><span class="mono">${r.EVENT_ID}</span></td>
       <td class="truncate">${fmt(r.EVENT_TITLE)}</td>
-      <td>${r.TEAM_ID ? `<span class="mono">${r.TEAM_ID}</span>` : '—'}</td>
+      <td>${r.TEAM_ID ? `<span class="mono">${r.TEAM_ID}</span>${r.TEAM_NAME ? ` - ${r.TEAM_NAME}` : ''}` : '—'}</td>
+      <td>${r.PAYMENT_ID ? `<span class="mono">${r.PAYMENT_ID}</span> ${badge(r.PAYMENT_STATUS)}` : '—'}</td>
       <td>${fmtDate(r.REGISTRATION_DATE)}</td>
       <td>${badge(r.STATUS)}</td>
       <td>
@@ -697,14 +732,27 @@ document.getElementById('btnEditTeam').addEventListener('click', async () => {
   });
 });
 
+const newRegistrationDropdown = document.getElementById('newRegistrationDropdown');
+document.getElementById('btnNewRegistration').addEventListener('click', (e) => {
+  e.stopPropagation();
+  newRegistrationDropdown.classList.toggle('open');
+});
+document.addEventListener('click', (e) => {
+  if (!newRegistrationDropdown.contains(e.target)) {
+    newRegistrationDropdown.classList.remove('open');
+  }
+});
+
 document.getElementById('btnRegisterTeamGroup').addEventListener('click', () => {
-  openModal('Register Team Group', teamGroupRegistrationForm());
+  newRegistrationDropdown.classList.remove('open');
+  openModal('Team Registration', teamGroupRegistrationForm());
   document.getElementById('f_team_group_id').addEventListener('change', updateTeamGroupDetails);
   updateTeamGroupDetails();
   document.getElementById('teamGroupRegSubmitBtn').addEventListener('click', submitTeamGroupRegistration);
 });
 
 document.getElementById('btnAddRegistration').addEventListener('click', () => {
+  newRegistrationDropdown.classList.remove('open');
   openModal('New Registration', registrationForm());
   document.getElementById('regSubmitBtn').addEventListener('click', submitAddRegistration);
 });
@@ -719,7 +767,7 @@ function teamForm() {
   return `
     <div class="form-grid">
       <div class="form-group">
-        <label class="form-label">Team ID * (not Registration ID)</label>
+        <label class="form-label">TEAM ID *</label>
         <input class="form-control" id="f_team_id" type="number" placeholder="Unique team ID" value="${genId()}">
       </div>
       <div class="form-group">
@@ -727,7 +775,7 @@ function teamForm() {
         <input class="form-control" id="f_team_date" type="date" value="${today}">
       </div>
       <div class="form-group full">
-        <label class="form-label">Team Name * (what this Team ID represents)</label>
+        <label class="form-label">TEAM NAME *</label>
         <input class="form-control" id="f_team_name" type="text" placeholder="e.g. Code Ninjas">
       </div>
       <div class="form-group full">
@@ -738,7 +786,8 @@ function teamForm() {
         </select>
       </div>
       <div class="form-group full">
-        <label class="form-label">Leader Student * (must be selected in Team Members)</label>
+        <label class="form-label">TEAM LEADER *</label>
+        <div style="font-size:12px; color:var(--text-3);">Select a leader from the chosen team members.</div>
         <select class="form-control" id="f_team_leader_id">
           <option value="">Select members first</option>
         </select>
@@ -982,11 +1031,19 @@ async function submitEditTeam(teamId) {
 function teamGroupRegistrationForm() {
   const today = new Date().toISOString().split('T')[0];
   const teamOpts = cachedTeams.length
-    ? cachedTeams.map(t => `<option value="${t.TEAM_ID}">${t.TEAM_NAME} (ID ${t.TEAM_ID}) - ${t.EVENT_TITLE}</option>`).join('')
+    ? cachedTeams.map(t => `<option value="${t.TEAM_ID}">${t.TEAM_ID} - ${t.TEAM_NAME}</option>`).join('')
     : '<option value="">— create/load teams first —</option>';
 
   return `
     <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Registration ID *</label>
+        <input class="form-control" id="f_team_group_reg_id" type="number" value="${genId()}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Registration Date *</label>
+        <input class="form-control" id="f_team_group_date" type="date" value="${today}">
+      </div>
       <div class="form-group full">
         <label class="form-label">Team *</label>
         <select class="form-control" id="f_team_group_id">
@@ -994,9 +1051,9 @@ function teamGroupRegistrationForm() {
           ${teamOpts}
         </select>
       </div>
-      <div class="form-group">
-        <label class="form-label">Registration Date *</label>
-        <input class="form-control" id="f_team_group_date" type="date" value="${today}">
+      <div class="form-group full">
+        <label class="form-label">Event</label>
+        <input class="form-control" id="f_team_group_event" type="text" disabled value="">
       </div>
       <div class="form-group full">
         <label class="form-label">Team Details</label>
@@ -1013,10 +1070,12 @@ function teamGroupRegistrationForm() {
 
 async function updateTeamGroupDetails() {
   const detailsEl = document.getElementById('f_team_group_details');
+  const eventEl = document.getElementById('f_team_group_event');
   const teamId = parseInt(document.getElementById('f_team_group_id')?.value);
   if (!detailsEl) return;
   if (!teamId) {
     detailsEl.innerHTML = 'Select a team to view members and leader.';
+    if (eventEl) eventEl.value = '';
     return;
   }
 
@@ -1025,6 +1084,7 @@ async function updateTeamGroupDetails() {
     const res = await apiGet(`/api/teams/${teamId}/members`);
     const team = res.data?.team || {};
     const members = res.data?.members || [];
+    if (eventEl) eventEl.value = `${fmt(team.EVENT_ID)} - ${fmt(team.EVENT_TITLE)}`;
     const memberList = members.length
       ? members.map(m => `${m.FULL_NAME} (${m.ROLL_NO})${m.STUDENT_ID === team.LEADER_STUDENT_ID ? ' [Leader]' : ''}`).join('<br>')
       : 'No members found';
@@ -1040,15 +1100,17 @@ async function updateTeamGroupDetails() {
 }
 
 async function submitTeamGroupRegistration() {
+  const registrationId = parseInt(document.getElementById('f_team_group_reg_id').value);
   const teamId = parseInt(document.getElementById('f_team_group_id').value);
   const registrationDate = document.getElementById('f_team_group_date').value;
 
-  if (!teamId || !registrationDate) {
-    showToast('Please select a team and date', 'error'); return;
+  if (!registrationId || !teamId || !registrationDate) {
+    showToast('Please enter registration ID, team, and date', 'error'); return;
   }
 
   try {
     const res = await apiPost('/api/registrations/team', {
+      registration_id: registrationId,
       team_id: teamId,
       registration_date: registrationDate,
     });
@@ -1141,9 +1203,9 @@ async function openEditRegistration(registrationId) {
   const isPaidEvent = Number(reg.FEE || 0) > 0;
   const paymentStatus = String(reg.PAYMENT_STATUS || '').toUpperCase();
   const paymentPending = isPaidEvent && (!paymentStatus || paymentStatus === 'PENDING');
-  const allowedStatuses = paymentPending
-    ? ['PENDING', 'REGISTERED']
-    : ['PENDING', 'REGISTERED', 'CONFIRMED', 'CANCELLED', 'ATTENDED'];
+  const allowedStatuses = isPaidEvent
+    ? (paymentPending ? ['PENDING'] : ['REGISTERED', 'CONFIRMED', 'ATTENDED'])
+    : ['REGISTERED', 'CONFIRMED', 'ATTENDED'];
 
   let teamMembersBlock = `<div style="margin-top:8px; color:var(--text-3);">No team attached to this registration.</div>`;
   if (reg.TEAM_ID) {
@@ -1185,7 +1247,7 @@ async function openEditRegistration(registrationId) {
         <div class="form-control" style="background:var(--surface-2);">
           Event Fee: ${Number(reg.FEE || 0) > 0 ? `₹${Number(reg.FEE).toLocaleString('en-IN')}` : 'Free'}<br>
           Payment Status: ${fmt(reg.PAYMENT_STATUS, 'N/A')}<br>
-          ${paymentPending ? 'Only PENDING or REGISTERED allowed until payment status changes.' : 'All edit statuses are available.'}
+          ${paymentPending ? 'Only PENDING is allowed until payment status changes to SUCCESS.' : 'Follow the available status flow for this registration.'}
         </div>
       </div>
       <div class="form-group full">
@@ -1288,7 +1350,7 @@ function paymentForm() {
       </div>
       <div class="form-group">
         <label class="form-label">Amount (₹) *</label>
-        <input class="form-control" id="f_pay_amount" type="number" step="0.01" placeholder="0.00">
+        <input class="form-control" id="f_pay_amount" type="number" min="0" step="0.01" placeholder="0.00">
       </div>
       <div class="form-group">
         <label class="form-label">Payment Mode *</label>
@@ -1305,7 +1367,6 @@ function paymentForm() {
         <select class="form-control" id="f_pay_status">
           <option value="PENDING">Pending</option>
           <option value="SUCCESS">Success</option>
-          <option value="FAILED">Failed</option>
         </select>
       </div>
       <div class="form-group">
@@ -1323,7 +1384,7 @@ async function submitAddPayment() {
   const regId  = parseInt(document.getElementById('f_pay_reg_id').value);
   const amount = parseFloat(document.getElementById('f_pay_amount').value);
 
-  if (!regId || isNaN(amount) || amount <= 0) {
+  if (!regId || Number.isNaN(amount) || amount < 0) {
     showToast('Please fill in all required fields correctly', 'error'); return;
   }
 
@@ -1387,7 +1448,7 @@ async function openEditPayment(paymentId) {
       </div>
       <div class="form-group">
         <label class="form-label">Amount (₹) *</label>
-        <input class="form-control" id="f_pay_edit_amount" type="number" step="0.01" value="${payment.AMOUNT}">
+        <input class="form-control" id="f_pay_edit_amount" type="number" min="0" step="0.01" value="${payment.AMOUNT}">
       </div>
       <div class="form-group">
         <label class="form-label">Payment Mode *</label>
@@ -1400,7 +1461,7 @@ async function openEditPayment(paymentId) {
       <div class="form-group">
         <label class="form-label">Payment Status *</label>
         <select class="form-control" id="f_pay_edit_status">
-          ${['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'].map(s =>
+          ${['PENDING', 'SUCCESS'].map(s =>
             `<option value="${s}" ${String(payment.PAYMENT_STATUS || '').toUpperCase() === s ? 'selected' : ''}>${s}</option>`
           ).join('')}
         </select>
@@ -1408,14 +1469,6 @@ async function openEditPayment(paymentId) {
       <div class="form-group">
         <label class="form-label">Payment Date *</label>
         <input class="form-control" id="f_pay_edit_date" type="date" value="${payment.PAYMENT_DATE ? String(payment.PAYMENT_DATE).split('T')[0] : ''}">
-      </div>
-      <div class="form-group full">
-        <label class="form-label">Registration Status</label>
-        <select class="form-control" id="f_pay_edit_reg_status">
-          ${['PENDING', 'REGISTERED', 'CONFIRMED', 'CANCELLED', 'ATTENDED'].map(s =>
-            `<option value="${s}" ${String(payment.REGISTRATION_STATUS || '').toUpperCase() === s ? 'selected' : ''}>${s}</option>`
-          ).join('')}
-        </select>
       </div>
       <div class="form-group full">
         <label class="form-label">Team Details</label>
@@ -1440,9 +1493,8 @@ async function submitEditPayment(paymentId) {
   const paymentMode = document.getElementById('f_pay_edit_mode').value;
   const paymentStatus = document.getElementById('f_pay_edit_status').value;
   const paymentDate = document.getElementById('f_pay_edit_date').value;
-  const registrationStatus = document.getElementById('f_pay_edit_reg_status').value;
 
-  if (!registrationId || Number.isNaN(amount) || amount <= 0 || !paymentDate) {
+  if (!registrationId || Number.isNaN(amount) || amount < 0 || !paymentDate) {
     showToast('Please fill in payment fields correctly', 'error'); return;
   }
 
@@ -1455,12 +1507,7 @@ async function submitEditPayment(paymentId) {
       payment_date: paymentDate,
     });
 
-    try {
-      await apiPatch(`/api/registrations/${registrationId}`, { status: registrationStatus });
-      showToast('Payment and registration status updated');
-    } catch (err) {
-      showToast(`Payment updated, but registration status not updated: ${err.message}`, 'error');
-    }
+    showToast(paymentStatus === 'SUCCESS' ? 'Payment updated and registration marked REGISTERED' : 'Payment updated');
 
     closeModal();
     loadPayments();

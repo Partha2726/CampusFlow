@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CECMS — College Event & Club Management</title>
+  <title>CampusFlow</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
@@ -15,8 +15,7 @@
     <div class="sidebar-brand">
       <div class="brand-icon">◈</div>
       <div class="brand-text">
-        <span class="brand-title">CECMS</span>
-        <span class="brand-sub">Management Portal</span>
+        <span class="brand-title">CampusFlow</span>
       </div>
     </div>
 
@@ -46,24 +45,12 @@
         <span>Feedback</span>
       </button>
     </nav>
-
-    <div class="sidebar-footer">
-      <div class="sidebar-footer-label">College Event & Club<br/>Management System</div>
-    </div>
   </aside>
 
 
   <main class="main">
 
-    <header class="topbar">
-      <button class="menu-toggle" id="menuToggle">☰</button>
-      <div class="topbar-title" id="topbarTitle">Dashboard</div>
-      <div class="topbar-right">
-        <div class="status-dot"></div>
-        <span class="status-label">Live</span>
-      </div>
-    </header>
-
+    <button class="menu-toggle" id="menuToggle">☰</button>
 
     <div class="toast-container" id="toastContainer"></div>
 
@@ -81,7 +68,6 @@
     <section class="page active" id="page-dashboard">
       <div class="page-header">
         <h1 class="page-title">Dashboard</h1>
-        <p class="page-subtitle">System overview at a glance</p>
       </div>
 
       <div class="stat-grid" id="dashboardStats">
@@ -211,10 +197,15 @@
           <p class="page-subtitle">Register students for events</p>
         </div>
         <div style="display:flex; gap:10px;">
-          <button class="btn btn-primary" id="btnRegisterTeamGroup">+ Register Team Group</button>
-          <button class="btn btn-primary" id="btnEditTeam">+ Edit Team</button>
           <button class="btn btn-primary" id="btnAddTeam">+ Create Team</button>
-          <button class="btn btn-primary" id="btnAddRegistration">+ New Individual Registration</button>
+          <button class="btn btn-primary" id="btnEditTeam">+ Edit Team</button>
+          <div class="dropdown" id="newRegistrationDropdown">
+            <button class="btn btn-primary" id="btnNewRegistration" type="button">+ New Registration ▼</button>
+            <div class="dropdown-menu" id="newRegistrationMenu">
+              <button type="button" id="btnAddRegistration">Individual Registration</button>
+              <button type="button" id="btnRegisterTeamGroup">Team Registration</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -228,11 +219,11 @@
             <thead>
               <tr>
                 <th>Reg. ID</th><th>Student ID</th><th>Student Name</th><th>Event ID</th>
-                <th>Event Title</th><th>Team ID</th><th>Date</th><th>Status</th><th>Actions</th>
+                <th>Event Title</th><th>Team ID</th><th>Payment</th><th>Date</th><th>Status</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="registrationsBody">
-              <tr><td colspan="9" class="empty-row">Loading…</td></tr>
+              <tr><td colspan="10" class="empty-row">Loading…</td></tr>
             </tbody>
           </table>
         </div>

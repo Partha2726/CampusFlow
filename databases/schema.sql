@@ -1,4 +1,4 @@
--- Extracted from CECMS_Schema.pdf
+-- CampusFlow schema
 
 CREATE TABLE STUDENT (
   STUDENT_ID INT PRIMARY KEY,
